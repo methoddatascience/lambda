@@ -1,5 +1,6 @@
 #HOME_CREDIT_DEFAULT_RISK submitted by team Lambda 
 
+#importing libraries
 import pandas as pd
 import numpy as np
 
@@ -31,7 +32,7 @@ dataset = one_hot_df.iloc[:dataset.shape[0],:]
 test = one_hot_df.iloc[dataset.shape[0]:,]
 
 
-#delete features with too many missing data
+#delete features with too many missing data(found no feature with data missing more than 80%)
 test = test[test.columns[dataset.isnull().mean() < 0.80]]
 dataset = dataset[dataset.columns[dataset.isnull().mean() < 0.80]]
 
@@ -40,18 +41,19 @@ import gc
 
 gc.enable()
 
+#parameter for k-fold(no of division or splits =5)
 folds = KFold(n_splits=5, shuffle=True, random_state=546789)
 oof_preds = np.zeros(dataset.shape[0])
 test_preds = np.zeros(test.shape[0])
 
-feature_importance_df = pd.DataFrame()
-
 ftr = [f for f in dataset.columns if f not in ['SK_ID_CURR']]
 
-for n_fold, (trn_idx, val_idx) in enumerate(folds.split(dataset)):
-    trn_x, trn_y = dataset[ftr].iloc[trn_idx], y.iloc[trn_idx]
+for n_fold, (trn_idx, val_idx) in enumerate(folds.split(dataset)): #output the selected index by the k-fold
+    #set train and test data by the selected index
+    trn_x, trn_y = dataset[ftr].iloc[trn_idx], y.iloc[trn_idx] 
     val_x, val_y = dataset[ftr].iloc[val_idx], y.iloc[val_idx]
     
+    #setting parameters
     clf = LGBMClassifier(
         n_estimators=10000,
         learning_rate=0.03,
@@ -66,20 +68,17 @@ for n_fold, (trn_idx, val_idx) in enumerate(folds.split(dataset)):
         silent=-1,
         verbose=-1,
         )
-    
+    #fittig the classifier to trainig set
     clf.fit(trn_x, trn_y, 
             eval_set= [(trn_x, trn_y), (val_x, val_y)], 
             eval_metric='auc', verbose=100, early_stopping_rounds=100  
            )
     
+    #predicting probability instead of just 0,1
     oof_preds[val_idx] = clf.predict_proba(val_x, num_iteration=clf.best_iteration_)[:, 1]
     test_preds += clf.predict_proba(test[ftr], num_iteration=clf.best_iteration_)[:, 1] / folds.n_splits
     
-    fold_importance_df = pd.DataFrame()
-    fold_importance_df["feature"] = ftr
-    fold_importance_df["importance"] = clf.feature_importances_
-    fold_importance_df["fold"] = n_fold + 1
-    feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
+    
     
     print('Fold %2d AUC : %.5f' % (n_fold + 1, roc_auc_score(val_y, oof_preds[val_idx])))
     del clf, trn_x, trn_y, val_x, val_y
@@ -90,7 +89,6 @@ print('Full AUC score %.6f' % roc_auc_score(y, oof_preds))
 test['TARGET'] = test_preds
 
 test[['SK_ID_CURR', 'TARGET']].to_csv('submission_2_lambda.csv', index=False)
-
 
 
 
