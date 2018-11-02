@@ -9,7 +9,6 @@
 Team Members:
 
 	Shivam Soni 
-	Punardeep  
 	Adish Ashraff
 	Pritam Pradhan
 
